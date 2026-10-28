@@ -1,0 +1,14 @@
+# Data and model weights (too large for GitHub)
+dataset/
+data/
+*.pth
+*.h5
+*.keras
+*.zip
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
