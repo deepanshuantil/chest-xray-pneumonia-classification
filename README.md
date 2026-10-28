@@ -9,7 +9,9 @@ Classifying chest X-ray images into **Normal**, **Bacterial Pneumonia** and **Vi
 
 ---
 
-## Results
+> **🔧 Update — v2 leak-free pipeline:** while reviewing v1 I found that augmented copies were made *before* the train/test split, so the test set could contain altered copies of training images. [`chest_xray_classification_v2.ipynb`](notebooks/chest_xray_classification_v2.ipynb) fixes this (patient-level split first, augment training data only, clean eval transforms). The results below are from **v1**; v2 results will replace them once retrained on a GPU. See [What v2 fixes](#what-v2-fixes).
+
+## Results (v1)
 
 | Model | Framework | Test accuracy | Epochs (early stopping) |
 |---|---|---|---|
@@ -94,7 +96,8 @@ All models use 224×224 inputs, batch size 32, and on-the-fly augmentation durin
 ```
 .
 ├── notebooks/
-│   └── chest_xray_classification.ipynb   # full pipeline: data prep, augmentation, 4 models, evaluation
+│   ├── chest_xray_classification.ipynb      # v1: original pipeline and results
+│   └── chest_xray_classification_v2.ipynb   # v2: leak-free split, same 4 models, shared evaluation
 ├── images/                               # figures exported from the notebook
 ├── requirements.txt
 └── README.md
@@ -103,14 +106,25 @@ All models use 224×224 inputs, batch size 32, and on-the-fly augmentation durin
 ## How to run
 
 1. Download the dataset from Kaggle and place the `NORMAL` and `PNEUMONIA` folders under one input folder.
-2. Open `notebooks/chest_xray_classification.ipynb` on **Kaggle** or **Google Colab** with a GPU enabled (the notebook was run on Kaggle; paths use `/kaggle/input/...` and `/kaggle/working/...` — update them if you run elsewhere).
+2. Open `notebooks/chest_xray_classification_v2.ipynb` on **Kaggle** with a GPU and Internet enabled. Set `INPUT_DIR` in the first code cell if your dataset path differs from `/kaggle/input/chest-xray-pneumonia/chest_xray`.
 3. Install dependencies if needed: `pip install -r requirements.txt`
 4. Run all cells top to bottom.
 
-## Limitations and next steps
+## What v2 fixes
 
-- **Possible data leakage:** augmented copies were created *before* the train/val/test split, so variants of the same original X-ray can appear in both training and test sets. Reported accuracy is therefore likely optimistic. Next step: split first, augment only the training set, and keep the test set to original images.
-- In the PyTorch runs, `random_split` shares the training transforms with the validation/test subsets; separate eval transforms would give a cleaner measurement.
+| Problem in v1 | Fix in v2 |
+|---|---|
+| Augmented copies were created **before** the train/val/test split, so near-copies of one X-ray could be in both training and test | Split the **original** images first; augment the **training set only** — val/test hold untouched originals |
+| Several X-rays come from the **same patient** | **Patient-level split** with `StratifiedGroupKFold`, checked by an assertion so no patient appears in two sets |
+| PyTorch `random_split` gave val/test images the **training augmentations** | Separate folders and transforms: random augmentation for train, plain resize + normalise for val/test |
+| Keras EfficientNet got 0–1 inputs, but it rescales internally and expects 0–255 | Raw 0–255 pixels fed to EfficientNet |
+| Each model evaluated slightly differently | One shared evaluation for all models (accuracy, macro F1, per-class F1, confusion matrix) saved to `results/` |
+
+v2 scores are expected to be somewhat **lower** than v1 — they are the honest numbers for how the model handles X-rays from new patients.
+
+## Next steps
+
+- Retrain v2 on Kaggle GPU and publish its results here.
 - Bacterial vs viral confusion is the main error source — class-weighted loss, higher input resolution or Grad-CAM inspection could help.
 - Add AUC/ROC, Grad-CAM explainability, and a simple Streamlit/Gradio demo.
 
